@@ -277,18 +277,18 @@
     <div class="form-group">
       <label class="form-label">Recursos de referencia (opcional)</label>
       <div class="recurso-tipos" id="recurso-tipos">
-        <button type="button" class="recurso-tipo-btn activo" data-tipo="youtube" onclick="cambiarTipoRecurso('youtube')">▶ YouTube</button>
+        <button type="button" class="recurso-tipo-btn activo" data-tipo="video" onclick="cambiarTipoRecurso('video')">🎬 Video</button>
         <button type="button" class="recurso-tipo-btn" data-tipo="imagen" onclick="cambiarTipoRecurso('imagen')">🖼 Imagen</button>
         <button type="button" class="recurso-tipo-btn" data-tipo="pdf" onclick="cambiarTipoRecurso('pdf')">📄 PDF</button>
         <button type="button" class="recurso-tipo-btn" data-tipo="audio" onclick="cambiarTipoRecurso('audio')">🎧 Audio</button>
         <button type="button" class="recurso-tipo-btn" data-tipo="link" onclick="cambiarTipoRecurso('link')">🔗 Link</button>
       </div>
-      <div id="recurso-input-url" class="recurso-input-block">
-        <input class="yt-config-input" id="recurso-url" placeholder="Pega el enlace de YouTube..."/>
+      <div id="recurso-input-url" class="recurso-input-block" style="display:none;">
+        <input class="yt-config-input" id="recurso-url" placeholder="Pega el enlace..."/>
       </div>
-      <div id="recurso-input-file" class="recurso-input-block" style="display:none;">
+      <div id="recurso-input-file" class="recurso-input-block">
         <div class="recurso-upload-area" onclick="document.getElementById('recurso-file').click()">
-          <input type="file" id="recurso-file" onchange="previewArchivoRecurso(this)"/>
+          <input type="file" id="recurso-file" accept="video/*" onchange="previewArchivoRecurso(this)"/>
           <div class="recurso-upload-text" id="recurso-file-text">Toca para elegir un archivo</div>
         </div>
         <div class="recurso-o-link">— o pega un enlace —</div>
@@ -608,12 +608,12 @@
     return '';
   }
 
-  // ── RECURSOS (multi-formato: youtube, imagen, pdf, audio, link) ──
-  const RECURSO_ICONOS={youtube:'▶',imagen:'🖼',pdf:'📄',audio:'🎧',link:'🔗'};
-  const RECURSO_LABELS={youtube:'Video',imagen:'Imagen',pdf:'PDF',audio:'Audio',link:'Enlace'};
-  const RECURSO_ORDEN=['youtube','imagen','pdf','audio','link'];
+  // ── RECURSOS (multi-formato: video, imagen, pdf, audio, link) ──
+  const RECURSO_ICONOS={video:'🎬',imagen:'🖼',pdf:'📄',audio:'🎧',link:'🔗'};
+  const RECURSO_LABELS={video:'Video',imagen:'Imagen',pdf:'PDF',audio:'Audio',link:'Enlace'};
+  const RECURSO_ORDEN=['video','imagen','pdf','audio','link'];
   window.recursosNuevoCafe=[];
-  window.tipoRecursoActual='youtube';
+  window.tipoRecursoActual='video';
   window.recursoArchivoData='';
   window.recursoArchivoNombre='';
   window.recursoIdx={};
@@ -621,12 +621,12 @@
   window.cambiarTipoRecurso = function(tipo){
     window.tipoRecursoActual=tipo;
     document.querySelectorAll('.recurso-tipo-btn').forEach(b=>b.classList.toggle('activo', b.dataset.tipo===tipo));
-    const esUrl=(tipo==='youtube'||tipo==='link');
+    const esUrl=(tipo==='link');
     document.getElementById('recurso-input-url').style.display=esUrl?'block':'none';
     document.getElementById('recurso-input-file').style.display=esUrl?'none':'block';
-    document.getElementById('recurso-url').placeholder = tipo==='youtube' ? 'Pega el enlace de YouTube...' : 'Pega el enlace...';
+    document.getElementById('recurso-url').placeholder = 'Pega el enlace...';
     document.getElementById('recurso-url').value='';
-    const accept = tipo==='imagen' ? 'image/*' : (tipo==='pdf' ? 'application/pdf' : (tipo==='audio' ? 'audio/*' : ''));
+    const accept = tipo==='imagen' ? 'image/*' : (tipo==='pdf' ? 'application/pdf' : (tipo==='audio' ? 'audio/*' : (tipo==='video' ? 'video/*' : '')));
     document.getElementById('recurso-file').accept=accept;
     document.getElementById('recurso-file').value='';
     window.recursoArchivoData=''; window.recursoArchivoNombre='';
@@ -649,11 +649,9 @@
     const tipo=window.tipoRecursoActual;
     const etiqueta=document.getElementById('recurso-etiqueta').value.trim();
     let valor='', nombre=etiqueta;
-    if(tipo==='youtube'||tipo==='link'){
+    if(tipo==='link'){
       valor=document.getElementById('recurso-url').value.trim();
-      if(tipo==='youtube'){
-        if(!ytIdFromUrl(valor)){showToast('Enlace de YouTube no válido');return;}
-      } else if(!valor){showToast('Pega un enlace');return;}
+      if(!valor){showToast('Pega un enlace');return;}
     } else {
       valor=window.recursoArchivoData || document.getElementById('recurso-url-alt').value.trim();
       if(!valor){showToast('Sube un archivo o pega un enlace');return;}
@@ -684,9 +682,8 @@
   }
 
   function renderRecursoContenido(r){
-    if(r.tipo==='youtube'){
-      const vid=ytIdFromUrl(r.valor);
-      return vid ? '<iframe src="https://www.youtube.com/embed/'+vid+'" style="width:100%;height:180px;border:none;border-radius:6px;display:block;"></iframe>' : '<div class="recurso-error">Enlace no válido</div>';
+    if(r.tipo==='video'){
+      return '<video controls style="width:100%;max-height:220px;border-radius:6px;background:#000;display:block;" src="'+r.valor+'"></video>';
     }
     if(r.tipo==='imagen'){
       return '<img src="'+r.valor+'" style="width:100%;max-height:220px;object-fit:contain;border-radius:6px;background:var(--surface2);display:block;" alt=""/>';
