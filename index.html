@@ -133,6 +133,10 @@
     .mesa-thumb-ph{width:52px;height:52px;background:var(--surface2);border:2px solid var(--border);border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;}
     .mesa-cafe-titulo{font-size:.95rem;font-weight:bold;color:var(--white);margin-bottom:4px;}
     .mesa-cafe-arg{font-size:.76rem;color:var(--gray);line-height:1.5;text-align:justify;}
+    .mesa-codigo-chip{display:flex;align-items:center;gap:8px;padding:9px 16px;background:var(--surface2);border-bottom:1px solid var(--border);cursor:pointer;font-family:Arial,sans-serif;font-size:.78rem;color:var(--gray);letter-spacing:.02em;}
+    .mesa-codigo-chip .ricon{width:1.05em;height:1.05em;color:var(--naranja-1);}
+    .mesa-codigo-chip b{color:var(--white);letter-spacing:.12em;font-family:monospace,Arial,sans-serif;}
+    .mesa-codigo-chip:active{background:var(--surface);}
     .turno-ind{padding:10px 16px;background:var(--surface2);font-size:.75rem;color:var(--turquesa);text-align:center;letter-spacing:.06em;border-bottom:1px solid var(--border);font-family:Arial,sans-serif;}
 
     /* MENSAJES */
@@ -409,6 +413,11 @@
       <div class="mesa-cafe-arg" id="mesa-arg">—</div>
     </div>
   </div>
+  <div class="mesa-codigo-chip" id="mesa-codigo-chip" onclick="copiarCodigo()" title="Toca para copiar el código de invitación">
+    <svg class="ricon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    <span>Código: <b id="mesa-codigo-txt">------</b></span>
+    <svg class="ricon" viewBox="0 0 24 24" style="margin-left:auto;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+  </div>
   <div id="mesa-recursos-cont" style="display:none;border-bottom:1px solid var(--border);padding:12px 16px;">
     <div class="recursos-titulo">📎 Recursos de referencia</div>
     <div id="mesa-recursos-lista"></div>
@@ -679,6 +688,11 @@
 
   window.previewArchivoRecurso = function(input){
     const f=input.files[0]; if(!f)return;
+    if(f.size > MAX_ARCHIVO_MB*1024*1024){
+      showToast('Ese archivo pesa más de '+MAX_ARCHIVO_MB+' MB. Para videos pesados, sube el video a otro sitio (Drive, YouTube, etc.) y pega el enlace en su lugar.');
+      input.value='';
+      return;
+    }
     const reader=new FileReader();
     reader.onload = e => {
       window.recursoArchivoData=e.target.result;
@@ -952,15 +966,34 @@
   };
 
   // ── BORRADORES ──
+  const MAX_ARCHIVO_MB = 3;
+  const MAX_TOTAL_MB = 5;
+  function tamanioMB(str){ return (str?str.length:0)/1024/1024; }
+  function tamanioTotalMB(imagen, recursos){
+    let total = tamanioMB(imagen);
+    (recursos||[]).forEach(r=>{ total += tamanioMB(r.valor); });
+    return total;
+  }
   function getBorradores() { try{return JSON.parse(localStorage.getItem('ca_borradores')||'[]');}catch(e){return[];} }
   function setBorradores(l){localStorage.setItem('ca_borradores',JSON.stringify(l));}
 
   window.guardarBorrador = function() {
     const titulo=document.getElementById('cfg-titulo').value.trim();
     if (!titulo){showToast('Escribe un título antes de guardar');return;}
+    const imagen=window.imagenBase64||'';
+    const recursos=window.recursosNuevoCafe.slice();
+    if (tamanioTotalMB(imagen, recursos) > MAX_TOTAL_MB){
+      showToast('El café pesa demasiado para guardarse ('+MAX_TOTAL_MB+' MB máximo entre imagen y recursos). Quita algún archivo o usa enlaces en vez de subir videos.');
+      return;
+    }
     const lista=getBorradores();
-    lista.unshift({id:Date.now(),titulo,argumento:document.getElementById('cfg-argumento').value.trim(),nombre:document.getElementById('cfg-nombre').value.trim()||'Anónimo',foto:document.getElementById('cfg-foto-url').value.trim(),imagen:window.imagenBase64||'',recursos:window.recursosNuevoCafe.slice(),limite:document.getElementById('cfg-limite').value,fecha:new Date().toLocaleDateString('es-PE',{day:'numeric',month:'long',year:'numeric'})});
-    setBorradores(lista); showToast('Borrador guardado ✓');
+    lista.unshift({id:Date.now(),titulo,argumento:document.getElementById('cfg-argumento').value.trim(),nombre:document.getElementById('cfg-nombre').value.trim()||'Anónimo',foto:document.getElementById('cfg-foto-url').value.trim(),imagen,recursos,limite:document.getElementById('cfg-limite').value,fecha:new Date().toLocaleDateString('es-PE',{day:'numeric',month:'long',year:'numeric'})});
+    try{
+      setBorradores(lista);
+      showToast('Borrador guardado ✓');
+    }catch(e){
+      showToast('No se pudo guardar: el dispositivo no tiene espacio suficiente. Quita algún archivo pesado e intenta de nuevo.');
+    }
   };
 
   window.mostrarBorradores = function() {
@@ -1013,16 +1046,32 @@
   window.crearCafe = async function() {
     const titulo=document.getElementById('cfg-titulo').value.trim();
     if(!titulo){showToast('Escribe un título');return;}
+    const imagen=window.imagenBase64||'';
+    const recursos=window.recursosNuevoCafe.slice();
+    if (tamanioTotalMB(imagen, recursos) > MAX_TOTAL_MB){
+      showToast('El café pesa demasiado para crearse ('+MAX_TOTAL_MB+' MB máximo entre imagen y recursos). Quita algún archivo o usa enlaces en vez de subir videos.');
+      return;
+    }
     mostrarLoading(true);
-    const codigo='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'.split('').sort(()=>Math.random()-.5).slice(0,6).join('').split('').map(()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
-    const limite=document.getElementById('cfg-limite').value;
-    const cafeData={titulo,argumento:document.getElementById('cfg-argumento').value.trim(),imagen:window.imagenBase64||'',recursos:window.recursosNuevoCafe.slice(),nombreAnfitrion:document.getElementById('cfg-nombre').value.trim()||'Anónimo',fotoAnfitrion:window.driveLinkToDirect(document.getElementById('cfg-foto-url').value.trim()),nombreInvitado:null,fotoInvitado:'',turno:'anfitrion',estado:'abierto',checkAnfitrion:false,checkInvitado:false,nombreMemoria:'Café Abierto',limite,creadoEn:Date.now()};
-    await set(ref(db,'cafes/'+codigo),cafeData);
-    window.estado.cafeId=codigo; window.estado.rol='anfitrion'; window.estado.cafe=cafeData;
-    limiteCaracteres=parseInt(limite);
-    localStorage.setItem('ca_sesion',JSON.stringify({cafeId:codigo,rol:'anfitrion'}));
-    document.getElementById('compartir-codigo').textContent=codigo;
-    mostrarLoading(false); irA('screen-compartir');
+    try{
+      const codigo='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'.split('').sort(()=>Math.random()-.5).slice(0,6).join('').split('').map(()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+      const limite=document.getElementById('cfg-limite').value;
+      const cafeData={titulo,argumento:document.getElementById('cfg-argumento').value.trim(),imagen,recursos,nombreAnfitrion:document.getElementById('cfg-nombre').value.trim()||'Anónimo',fotoAnfitrion:window.driveLinkToDirect(document.getElementById('cfg-foto-url').value.trim()),nombreInvitado:null,fotoInvitado:'',turno:'anfitrion',estado:'abierto',checkAnfitrion:false,checkInvitado:false,nombreMemoria:'Café Abierto',limite,creadoEn:Date.now()};
+      const timeoutMs = 20000;
+      await Promise.race([
+        set(ref(db,'cafes/'+codigo),cafeData),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),timeoutMs))
+      ]);
+      window.estado.cafeId=codigo; window.estado.rol='anfitrion'; window.estado.cafe=cafeData;
+      limiteCaracteres=parseInt(limite);
+      localStorage.setItem('ca_sesion',JSON.stringify({cafeId:codigo,rol:'anfitrion'}));
+      document.getElementById('compartir-codigo').textContent=codigo;
+      irA('screen-compartir');
+    }catch(e){
+      showToast('No se pudo crear el café. Revisa tu conexión; si subiste videos o archivos pesados, prueba con enlaces en su lugar.');
+    }finally{
+      mostrarLoading(false);
+    }
   };
 
   window.copiarCodigo = function(){
@@ -1037,24 +1086,32 @@
     const nombre=document.getElementById('unirse-nombre').value.trim()||'Anónimo';
     if(codigo.length!==6){showToast('Ingresa un código de 6 caracteres');return;}
     mostrarLoading(true);
-    const snap=await get(ref(db,'cafes/'+codigo));
-    if(!snap.exists()){mostrarLoading(false);showToast('No se encontró ese Café');return;}
-    const cafe=snap.val();
-    if(cafe.estado==='cerrado'){mostrarLoading(false);showToast('Este Café ya está cerrado');return;}
-    const fotoInvitado=window.driveLinkToDirect(document.getElementById('unirse-foto').value.trim());
-    await update(ref(db,'cafes/'+codigo),{nombreInvitado:nombre,fotoInvitado});
-    window.estado.cafeId=codigo; window.estado.rol='invitado'; window.estado.cafe={...cafe,nombreInvitado:nombre,fotoInvitado};
-    limiteCaracteres=parseInt(cafe.limite||1500);
-    localStorage.setItem('ca_sesion',JSON.stringify({cafeId:codigo,rol:'invitado'}));
-    mostrarLoading(false); irA('screen-mesa'); cargarMesa();
+    try{
+      const snap=await get(ref(db,'cafes/'+codigo));
+      if(!snap.exists()){showToast('No se encontró ese Café');return;}
+      const cafe=snap.val();
+      if(cafe.estado==='cerrado'){showToast('Este Café ya está cerrado');return;}
+      const fotoInvitado=window.driveLinkToDirect(document.getElementById('unirse-foto').value.trim());
+      await update(ref(db,'cafes/'+codigo),{nombreInvitado:nombre,fotoInvitado});
+      window.estado.cafeId=codigo; window.estado.rol='invitado'; window.estado.cafe={...cafe,nombreInvitado:nombre,fotoInvitado};
+      limiteCaracteres=parseInt(cafe.limite||1500);
+      localStorage.setItem('ca_sesion',JSON.stringify({cafeId:codigo,rol:'invitado'}));
+      irA('screen-mesa'); cargarMesa();
+    }catch(e){
+      showToast('No se pudo unir al café. Revisa tu conexión e inténtalo de nuevo.');
+    }finally{
+      mostrarLoading(false);
+    }
   };
 
   // ── CARGAR MESA ──
   function cargarMesa(){
     const codigo=window.estado.cafeId;
+    document.getElementById('mesa-codigo-txt').textContent=codigo||'------';
     onValue(ref(db,'cafes/'+codigo),snap=>{
       if(!snap.exists())return;
       const cafe=snap.val(); window.estado.cafe=cafe;
+      document.getElementById('mesa-codigo-chip').style.display=(cafe.estado==='cerrado')?'none':'flex';
       document.getElementById('mesa-titulo-h').textContent=cafe.titulo||'Café Abierto';
       document.getElementById('mesa-titulo').textContent=cafe.titulo||'—';
       document.getElementById('mesa-arg').textContent=cafe.argumento||'—';
